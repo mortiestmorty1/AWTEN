@@ -1,0 +1,55 @@
+'use client';
+
+import React from 'react';
+import { createClient } from '@/lib/utils/supabase/client';
+import { type Provider } from '@supabase/supabase-js';
+import { getURL } from '@/lib/utils/helpers';
+import { redirectToPath } from './server';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+
+export async function handleRequest(
+  e: React.FormEvent<HTMLFormElement>,
+  requestFunc: (formData: FormData) => Promise<string>,
+  router: AppRouterInstance | null = null
+): Promise<boolean | void> {
+  // Prevent default form submission refresh
+  e.preventDefault();
+
+  const formData = new FormData(e.currentTarget);
+  const redirectUrl: string = await requestFunc(formData);
+
+  if (router) {
+    // If client-side router is provided, use it to redirect
+    return router.push(redirectUrl);
+  } else {
+    // Otherwise, redirect server-side
+    return await redirectToPath(redirectUrl);
+  }
+}
+
+export async function signInWithOAuth(e: React.FormEvent<HTMLFormElement>) {
+  // Prevent default form submission refresh
+  e.preventDefault();
+  const formData = new FormData(e.currentTarget);
+  const provider = String(formData.get('provider')).trim() as Provider;
+
+  // Get redirect parameter from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirectTo = urlParams.get('redirect');
+
+  // Create client-side supabase client and call signInWithOAuth
+  const supabase = createClient();
+  let redirectURL = getURL('/auth/callback');
+  
+  // Add redirect parameter if it exists
+  if (redirectTo) {
+    redirectURL += `?redirect=${encodeURIComponent(redirectTo)}`;
+  }
+  
+  await supabase.auth.signInWithOAuth({
+    provider: provider,
+    options: {
+      redirectTo: redirectURL
+    }
+  });
+}
